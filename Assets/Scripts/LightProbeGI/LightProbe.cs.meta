@@ -1,0 +1,13 @@
+fileFormatVersion: 2
+guid: f9df7cd4995d03c4589e16b3e3ddffe3
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - _shBakerShader: {fileID: 7200000, guid: 4ab6e3f96d2513a46bde5b30fff66433, type: 3}
+  - _shPreviewMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

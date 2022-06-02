@@ -1,0 +1,66 @@
+#pragma kernel CSMain
+
+RWStructuredBuffer<float3> _SHBuffer;
+TextureCube _CubeMap;
+SamplerState sampler_CubeMap;
+
+#define SAMPLE_COUNT 1024
+#define PI 3.14159265358
+#define Y0(v) (1.0 / 2.0) * sqrt(1.0 / PI)
+#define Y1(v) sqrt(3.0 / (4.0 * PI)) * v.z
+#define Y2(v) sqrt(3.0 / (4.0 * PI)) * v.y
+#define Y3(v) sqrt(3.0 / (4.0 * PI)) * v.x
+#define Y4(v) (1.0 / 2.0) * sqrt(15.0 / PI) * v.x * v.z
+#define Y5(v) (1.0 / 2.0) * sqrt(15.0 / PI) * v.z * v.y
+#define Y6(v) (1.0 / 4.0) * sqrt(5.0 / PI) * (-v.x * v.x - v.z * v.z + 2 * v.y * v.y)
+#define Y7(v) (1.0 / 2.0) * sqrt(15.0 / PI) * v.y * v.x
+#define Y8(v) (1.0 / 4.0) * sqrt(15.0 / PI) * (v.x * v.x - v.z * v.z)
+
+float4 UniformSampleSphere(float2 E)
+{
+    float Phi = 2 * PI * E.x;
+    float CosTheta = 1 - 2 * E.y;
+    float SinTheta = sqrt(1 - CosTheta * CosTheta);
+
+    float3 H;
+    H.x = SinTheta * cos(Phi);
+    H.y = SinTheta * sin(Phi);
+    H.z = CosTheta;
+
+    float PDF = 1.0 / (4 * PI);
+
+    return float4(H, PDF);
+}
+
+float hash(float3 p)
+{
+    p = frac(p * 0.3183099 + 0.1);
+    p *= 17.0;
+    return frac(p.x * p.y * p.z * (p.x + p.y + p.z));
+}
+
+[numthreads(1,1,1)]
+void CSMain (uint3 id : SV_DispatchThreadID)
+{
+    float factor = 4.0f * PI / SAMPLE_COUNT;
+    
+    float3 coeff = float3(0, 0, 0);
+    
+    for (int i = 0; i < SAMPLE_COUNT; i++)
+    {
+        // Generate sample ray
+        float x = hash(i);
+        float y = hash(i + id.x);
+        float2 uv = float2(x, y);
+        float3 p = UniformSampleSphere(uv).xyz;
+        p = normalize(p);
+        
+        // Sample env color
+        float4 col = _CubeMap.SampleLevel(sampler_CubeMap, p, 0);
+        
+        float h[9] = { Y0(p), Y1(p), Y2(p), Y3(p), Y4(p), Y5(p), Y6(p), Y7(p), Y8(p) };
+        coeff += col.rgb * h[id.x];
+    }
+    
+    _SHBuffer[id.x] = coeff * factor;
+}
