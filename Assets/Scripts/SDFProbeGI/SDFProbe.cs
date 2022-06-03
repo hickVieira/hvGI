@@ -38,8 +38,7 @@ namespace global_illumination
         [SerializeField] private Shader _shPreviewShader;
         [SerializeField] private Mesh _shPreviewMesh;
         [SerializeField] private SDFProbeType _type;
-        [SerializeField] private Color _color = Color.white;
-        [SerializeField][Range(0, 100)] private float _intensity = 1f;
+        [SerializeField][Range(0, 1)] private float _intensity = 1f;
         [SerializeField][Range(0, 100)] private float _radius = 0f;
         [SerializeField][Range(0.01f, 100)] private float _radiust = 1f;
         [SerializeField] private BoxCollider _boxCollider;
@@ -50,7 +49,6 @@ namespace global_illumination
         const int RESOLUTION = 128;
 
         public SDFProbeType Type { get => _type; }
-        public Color Color { get => _color; }
         public float Intensity { get => _intensity; }
         public float Radius { get => _radius; }
         public float RadiusT { get => _radiust; }

@@ -111,7 +111,6 @@
                 float3 positionWS = worldPosDepth.xyz;
 
                 float3 localP = mul(_BoxMatrix, float4(positionWS, 1.0));
-                // float boxDist = _BoxIntensity * (1 - saturate(sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y));
                 float boxDist = _BoxIntensity * saturate(1 - sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y);
 
                 return max(boxDist, oldSample);
