@@ -38,9 +38,9 @@ namespace global_illumination
         [SerializeField] private Shader _shPreviewShader;
         [SerializeField] private Mesh _shPreviewMesh;
         [SerializeField] private SDFProbeType _type;
-        [SerializeField][Range(0, 1)] private float _intensity = 1f;
-        [SerializeField][Range(0, 100)] private float _radius = 0f;
-        [SerializeField][Range(0.01f, 100)] private float _radiust = 1f;
+        [SerializeField][Range(0, 2)] private float _intensity = 1f;
+        [SerializeField][Range(0, 2)] private float _radius = 0f;
+        [SerializeField][Range(0.01f, 5)] private float _radiust = 1f;
         [SerializeField] private BoxCollider _boxCollider;
         [SerializeField] private float3[] _shCoefficients;
 
@@ -63,16 +63,20 @@ namespace global_illumination
         }
 #endif
 
-        void OnDrawGizmos()
+        void OnDrawGizmosSelected()
         {
-            Gizmos.color = new Color(1, 1, 1, 0.5f);
-            Gizmos.DrawSphere(transform.position, 0.05f);
-
-            Vector3 spherePosition = transform.position + BoxCollider.center;
-            Gizmos.DrawWireSphere(spherePosition, GenerateBoundingSphereRadius());
-
+            Gizmos.color = Color.white;
             Gizmos.matrix = Matrix4x4.TRS(transform.TransformPoint(BoxCollider.center), transform.rotation, Vector3.one);
             Gizmos.DrawCube(Vector3.zero, BoxCollider.size);
+
+            Gizmos.color = new Color(1, 1, 1, 0.25f);
+            Gizmos.DrawSphere(Vector3.zero, GenerateBoundingSphereRadius());
+        }
+
+        void OnDrawGizmos()
+        {
+            Gizmos.color = Color.white;
+            Gizmos.DrawSphere(transform.position, 0.05f);
 
             if (_shCoefficients == null || _shCoefficients.Length < 9)
                 return;
@@ -90,9 +94,7 @@ namespace global_illumination
             _shPreviewMaterial.SetVector("_y7", new Vector4(_shCoefficients[7].x, _shCoefficients[7].y, _shCoefficients[7].z, 0));
             _shPreviewMaterial.SetVector("_y8", new Vector4(_shCoefficients[8].x, _shCoefficients[8].y, _shCoefficients[8].z, 0));
             _shPreviewMaterial.SetPass(0);
-            // Matrix4x4 matrix = Matrix4x4.TRS(transform.TransformPoint(_lightSampleLocalPosition), Quaternion.identity, Vector3.one * 0.1f);
-            // Graphics.DrawMeshNow(_shPreviewMesh, matrix, 0);
-            Matrix4x4 matrix = Matrix4x4.TRS(transform.position, Quaternion.identity, Vector3.one * 0.1f);
+            Matrix4x4 matrix = Matrix4x4.TRS(transform.position, transform.rotation, Vector3.one * 0.1f);
             Graphics.DrawMeshNow(_shPreviewMesh, matrix, 0);
         }
 
@@ -125,7 +127,13 @@ namespace global_illumination
             return sphereRadius;
         }
 
-        public IEnumerator RenderCubemapAsync()
+        [NaughtyAttributes.Button]
+        public void BakeCubemap()
+        {
+            StartCoroutine(BakeCubemapAsync());
+        }
+
+        public IEnumerator BakeCubemapAsync()
         {
             Cubemap cubemap = new Cubemap(RESOLUTION, UnityEngine.Experimental.Rendering.DefaultFormat.HDR, UnityEngine.Experimental.Rendering.TextureCreationFlags.None);
             ComputeBuffer shBuffer = new ComputeBuffer(9, Marshal.SizeOf(typeof(float3)));
