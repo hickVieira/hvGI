@@ -65,12 +65,12 @@ namespace global_illumination
 
         void OnDrawGizmosSelected()
         {
-            Gizmos.color = Color.white;
+            Gizmos.color = new Color(1, 1, 1, 0.25f);
             Gizmos.matrix = Matrix4x4.TRS(transform.TransformPoint(BoxCollider.center), transform.rotation, Vector3.one);
             Gizmos.DrawCube(Vector3.zero, BoxCollider.size);
 
-            Gizmos.color = new Color(1, 1, 1, 0.25f);
-            Gizmos.DrawSphere(Vector3.zero, GenerateBoundingSphereRadius());
+            // Gizmos.color = new Color(1, 1, 1, 0.25f);
+            // Gizmos.DrawSphere(Vector3.zero, GenerateBoundingSphereRadius());
         }
 
         void OnDrawGizmos()

@@ -48,11 +48,13 @@ namespace global_illumination
             public void Add(SDFProbe newProbe, bool useSH)
             {
                 Vector3 boxSize = Vector3.Lerp(newProbe.BoxCollider.size, newProbe.BoxCollider.size + Vector3.one * newProbe.Radius, newProbe.RadiusT) / 2;
+                bool isSphere = (boxSize.x + boxSize.y + boxSize.z) <= EPSILON;
                 Vector3 spherePosition = newProbe.transform.position + newProbe.BoxCollider.center;
                 Matrix4x4 matrix = Matrix4x4.Translate(newProbe.BoxCollider.center).inverse * newProbe.transform.worldToLocalMatrix;
+                if (isSphere)
+                    matrix = Matrix4x4.Rotate(newProbe.transform.localRotation) * matrix;
                 Material newMaterial = new Material(newProbe.SDFProbeShader);
                 float sphereRadius = newProbe.GenerateBoundingSphereRadius();
-                bool isSphere = (boxSize.x + boxSize.y + boxSize.z) <= EPSILON;
 
                 newMaterial.SetMatrix("_BoxMatrix", matrix);
                 newMaterial.SetVector("_BoxSize", new Vector4(boxSize.x, boxSize.y, boxSize.z, 0));
@@ -111,33 +113,6 @@ namespace global_illumination
                 Bake(false);
         }
 
-        public IEnumerator BakeAsync(bool bakeCubeMaps)
-        {
-            _lightProbesBuffer?.Dispose();
-            _occlusionProbesBuffer?.Dispose();
-
-            _lightProbesBuffer = new ProbesBuffer();
-            _occlusionProbesBuffer = new ProbesBuffer();
-
-            SDFProbe[] rawProbes = FindObjectsOfType<SDFProbe>();
-
-            if (bakeCubeMaps)
-                for (int i = 0; i < rawProbes.Length; i++)
-                    yield return StartCoroutine(rawProbes[i].BakeCubemapAsync());
-
-            for (int i = 0; i < rawProbes.Length; i++)
-            {
-                if (rawProbes[i].Type == SDFProbe.SDFProbeType.Light)
-                    _lightProbesBuffer.Add(rawProbes[i], true);
-                else if (rawProbes[i].Type == SDFProbe.SDFProbeType.Occlusion)
-                    _occlusionProbesBuffer.Add(rawProbes[i], false);
-                yield return null;
-            }
-
-            _lightProbesBuffer.BakeCullingGroup(Camera.main);
-            _occlusionProbesBuffer.BakeCullingGroup(Camera.main);
-        }
-
         [NaughtyAttributes.Button]
         public void Bake(bool bakeCubeMaps)
         {
@@ -155,10 +130,15 @@ namespace global_illumination
 
             for (int i = 0; i < rawProbes.Length; i++)
             {
-                if (rawProbes[i].Type == SDFProbe.SDFProbeType.Light)
-                    _lightProbesBuffer.Add(rawProbes[i], true);
-                else if (rawProbes[i].Type == SDFProbe.SDFProbeType.Occlusion)
-                    _occlusionProbesBuffer.Add(rawProbes[i], false);
+                SDFProbe probe = rawProbes[i];
+
+                if (!probe.gameObject.activeSelf || !probe.enabled)
+                    continue;
+
+                if (probe.Type == SDFProbe.SDFProbeType.Light)
+                    _lightProbesBuffer.Add(probe, true);
+                else if (probe.Type == SDFProbe.SDFProbeType.Occlusion)
+                    _occlusionProbesBuffer.Add(probe, false);
             }
 
             _lightProbesBuffer.BakeCullingGroup(Camera.main);

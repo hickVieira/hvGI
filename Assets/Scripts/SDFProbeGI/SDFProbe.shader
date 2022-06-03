@@ -82,7 +82,7 @@
                     float sdf = _BoxIntensity * saturate(1 - sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y);
                 #endif
 
-                return max(sdf, oldSample);
+                return max(sdf * sdf, oldSample);
             }
             ENDHLSL
         }
@@ -261,7 +261,7 @@
 
                 float3 sh = SHL2Color(normalWS);
 
-                return float4(max(oldSample, sh * sdf), 1);
+                return float4(max(oldSample, sh * sdf * sdf), 1);
             }
             ENDHLSL
         }
