@@ -2,7 +2,7 @@ using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
 
-namespace GutEngine
+namespace global_illumination
 {
     public class LightProbeGIRenderFeature : ScriptableRendererFeature
     {

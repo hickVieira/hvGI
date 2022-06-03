@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 080654573b4039d4ca2b13d2d3efaf34
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences:
+  - _sdfProbeShader: {fileID: 4800000, guid: 8f859e45c00733c4491b7170fa8d539c, type: 3}
+  - _shBakerShader: {fileID: 7200000, guid: 4ab6e3f96d2513a46bde5b30fff66433, type: 3}
+  - _shPreviewShader: {fileID: 4800000, guid: 4afbb229251d836459de5ca4ff814f90, type: 3}
+  - _shPreviewMesh: {fileID: 10207, guid: 0000000000000000e000000000000000, type: 0}
+  - _boxCollider: {instanceID: 0}
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 

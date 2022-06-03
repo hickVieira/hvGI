@@ -1,7 +1,7 @@
 #if UNITY_EDITOR
 using UnityEngine;
 
-namespace GutEngine
+namespace global_illumination
 {
     [ExecuteInEditMode]
     public class LightProbeProxy : MonoBehaviour

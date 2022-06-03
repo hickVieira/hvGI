@@ -15,14 +15,14 @@ MonoBehaviour:
   m_Active: 1
   m_Shader: {fileID: 4800000, guid: 0849e84e3d62649e8882e9d6f056a017, type: 3}
   m_Settings:
-    Downsample: 0
+    Downsample: 1
     AfterOpaque: 0
     Source: 1
     NormalSamples: 1
-    Intensity: 1.25
+    Intensity: 1
     DirectLightingStrength: 0
-    Radius: 0.1
-    SampleCount: 20
+    Radius: 0.15
+    SampleCount: 12
 --- !u!114 &11400000
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -41,7 +41,8 @@ MonoBehaviour:
   - {fileID: -8789227722330706730}
   - {fileID: 6271180648528384544}
   - {fileID: 2112468530899307402}
-  m_RendererFeatureMap: d66c7630f46306862092d6dd92b507578acb71bfeffe501d
+  - {fileID: 6973269795089189692}
+  m_RendererFeatureMap: d66c7630f46306862092d6dd92b507578acb71bfeffe501d3c8b40c3ee07c660
   m_UseNativeRenderPass: 0
   postProcessData: {fileID: 11400000, guid: 41439944d30ece34e96484bdb6645b55, type: 2}
   xrSystemData: {fileID: 11400000, guid: 60e1133243b97e347b653163a8c01b64, type: 2}
@@ -103,5 +104,18 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 13d54e1f32ffc9942886e410454fc793, type: 3}
   m_Name: WorldPosition
+  m_EditorClassIdentifier: 
+  m_Active: 1
+--- !u!114 &6973269795089189692
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f00a1784ee1fc264bb96c75f95fcd9e4, type: 3}
+  m_Name: SDF Probe Global Illumination
   m_EditorClassIdentifier: 
   m_Active: 1

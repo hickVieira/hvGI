@@ -4,7 +4,7 @@ using Unity.Jobs;
 using Unity.Collections;
 using Unity.Mathematics;
 
-namespace GutEngine
+namespace global_illumination
 {
     [BurstCompile(FloatPrecision.High, FloatMode.Strict)]
     public struct Delaunay3DJob : IJob

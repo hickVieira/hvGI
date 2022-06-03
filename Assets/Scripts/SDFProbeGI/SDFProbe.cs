@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using UnityEngine.Rendering;
 using UnityEngine.Experimental.Rendering;
 using Unity.Mathematics;
@@ -7,7 +8,9 @@ using System.Runtime.InteropServices;
 
 namespace global_illumination
 {
-    public class LightProbe : MonoBehaviour
+    [RequireComponent(typeof(BoxCollider))]
+    [ExecuteInEditMode]
+    public class SDFProbe : MonoBehaviour
     {
         [StructLayout(LayoutKind.Sequential)]
         public struct SHL2
@@ -23,29 +26,59 @@ namespace global_illumination
             public float3 y8;
         }
 
+        [System.Serializable]
+        public enum SDFProbeType
+        {
+            Occlusion,
+            Light,
+        }
+
+        [SerializeField] private Shader _sdfProbeShader;
         [SerializeField] private ComputeShader _shBakerShader;
+        [SerializeField] private Shader _shPreviewShader;
         [SerializeField] private Mesh _shPreviewMesh;
-        [SerializeField] private Vector3 _lightSampleLocalPosition;
+        [SerializeField] private SDFProbeType _type;
+        [SerializeField] private Color _color = Color.white;
+        [SerializeField][Range(0, 100)] private float _intensity = 1f;
+        [SerializeField][Range(0, 100)] private float _radius = 0f;
+        [SerializeField][Range(0.01f, 100)] private float _radiust = 1f;
+        [SerializeField] private BoxCollider _boxCollider;
         [SerializeField] private float3[] _shCoefficients;
 
         private Material _shPreviewMaterial;
-        private static Shader _shPreviewShader;
 
         const int RESOLUTION = 128;
 
-        public Vector3 LightSampleLocalPosition { get => _lightSampleLocalPosition; set => _lightSampleLocalPosition = value; }
+        public SDFProbeType Type { get => _type; }
+        public Color Color { get => _color; }
+        public float Intensity { get => _intensity; }
+        public float Radius { get => _radius; }
+        public float RadiusT { get => _radiust; }
+        public BoxCollider BoxCollider { get => _boxCollider; }
         public float3[] SHCoefficients { get => _shCoefficients; }
+        public Shader SDFProbeShader { get => _sdfProbeShader; }
+
+#if UNITY_EDITOR
+        void OnValidate()
+        {
+            _boxCollider = gameObject.TryGetAddComponent<BoxCollider>();
+        }
+#endif
 
         void OnDrawGizmos()
         {
-            Gizmos.color = Color.cyan;
+            Gizmos.color = new Color(1, 1, 1, 0.5f);
             Gizmos.DrawSphere(transform.position, 0.05f);
+
+            Vector3 spherePosition = transform.position + BoxCollider.center;
+            Gizmos.DrawWireSphere(spherePosition, GenerateBoundingSphereRadius());
+
+            Gizmos.matrix = Matrix4x4.TRS(transform.TransformPoint(BoxCollider.center), transform.rotation, Vector3.one);
+            Gizmos.DrawCube(Vector3.zero, BoxCollider.size);
 
             if (_shCoefficients == null || _shCoefficients.Length < 9)
                 return;
 
-            if (_shPreviewShader == null)
-                _shPreviewShader = Shader.Find("hickv/SHPreview");
             if (_shPreviewMaterial == null)
                 _shPreviewMaterial = new Material(_shPreviewShader);
 
@@ -59,7 +92,9 @@ namespace global_illumination
             _shPreviewMaterial.SetVector("_y7", new Vector4(_shCoefficients[7].x, _shCoefficients[7].y, _shCoefficients[7].z, 0));
             _shPreviewMaterial.SetVector("_y8", new Vector4(_shCoefficients[8].x, _shCoefficients[8].y, _shCoefficients[8].z, 0));
             _shPreviewMaterial.SetPass(0);
-            Matrix4x4 matrix = Matrix4x4.TRS(transform.TransformPoint(_lightSampleLocalPosition), Quaternion.identity, Vector3.one * 0.1f);
+            // Matrix4x4 matrix = Matrix4x4.TRS(transform.TransformPoint(_lightSampleLocalPosition), Quaternion.identity, Vector3.one * 0.1f);
+            // Graphics.DrawMeshNow(_shPreviewMesh, matrix, 0);
+            Matrix4x4 matrix = Matrix4x4.TRS(transform.position, Quaternion.identity, Vector3.one * 0.1f);
             Graphics.DrawMeshNow(_shPreviewMesh, matrix, 0);
         }
 
@@ -85,6 +120,13 @@ namespace global_illumination
             };
         }
 
+        public float GenerateBoundingSphereRadius()
+        {
+            Vector3 boxSize = BoxCollider.size / 2;
+            float sphereRadius = math.max(math.max(boxSize.x, boxSize.y), boxSize.z) + 2 * Radius + RadiusT;
+            return sphereRadius;
+        }
+
         public IEnumerator RenderCubemapAsync()
         {
             Cubemap cubemap = new Cubemap(RESOLUTION, UnityEngine.Experimental.Rendering.DefaultFormat.HDR, UnityEngine.Experimental.Rendering.TextureCreationFlags.None);
@@ -93,16 +135,19 @@ namespace global_illumination
             // render cubemap using camera proxy object
             Camera camera = new GameObject("temp_camera", typeof(Camera)).GetComponent<Camera>();
             camera.allowHDR = true;
-            camera.transform.position = transform.TransformPoint(_lightSampleLocalPosition);
+            camera.transform.position = transform.position;
             camera.transform.rotation = Quaternion.identity;
             camera.nearClipPlane = 0.001f;
             camera.farClipPlane = 1000;
+            float oldIntensity = RenderSettings.ambientIntensity;
+            RenderSettings.ambientIntensity = 0;
             camera.RenderToCubemap(cubemap);
             // for (int i = 0; i < 6; i++)
             // {
             //     camera.RenderToCubemap(cubemap, i);
             //     yield return null;
             // }
+            RenderSettings.ambientIntensity = oldIntensity;
             camera.gameObject.DestroySelf();
 
             // bake cubemap to spherical harmonics

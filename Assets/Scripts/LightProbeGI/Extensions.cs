@@ -11,7 +11,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.IO;
 
-namespace GutEngine
+namespace global_illumination
 {
     public static partial class Extensions
     {

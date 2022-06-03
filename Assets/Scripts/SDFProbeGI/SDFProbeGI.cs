@@ -3,216 +3,154 @@ using Unity.Mathematics;
 using Unity.Jobs;
 using Unity.Collections;
 using System.Collections;
+using System.Collections.Generic;
 
-namespace GutEngine
+namespace global_illumination
 {
     [ExecuteInEditMode]
     public class SDFProbeGI : MonoBehaviour
     {
-        [SerializeField] private bool _updateTetrahedra;
-        [SerializeField] private LightProbe[] _lightProbes;
-        [SerializeField] private Vector3[] _vertices;
-        [SerializeField] private LightProbe.SHL2[] _shl2s;
-        [SerializeField] private Delaunay3DJob.Tetrahedron[] _tetrahedra;
-        [SerializeField] private BoundingSphere[] _tetrahedraBoundingSpheres;
-        [SerializeField] private Material[] _tetrahedraMaterials;
-        [SerializeField] private CullingGroup _tetrahedraCullingGroup;
+        [System.Serializable]
+        public class ProbesBuffer : System.IDisposable
+        {
+            [SerializeField] private List<SDFProbe> _probes;
+            [SerializeField] private List<Material> _materials;
+            [SerializeField] private CullingGroup _cullingGroup;
+            [SerializeField] private List<BoundingSphere> _boundingSpheres;
 
-        private static Shader _lightProbeGIShader;
+            public List<SDFProbe> Probes { get => _probes; }
+            public List<Material> Materials { get => _materials; }
+            public CullingGroup CullingGroup { get => _cullingGroup; }
+            public List<BoundingSphere> BoundingSpheres { get => _boundingSpheres; }
 
-        public int TetrahedraCount { get => _tetrahedra.Length; }
-        public CullingGroup TetrahedraCullingGroup { get => _tetrahedraCullingGroup; }
-        public Material[] TetrahedraMaterials { get => _tetrahedraMaterials; }
-        public BoundingSphere[] TetrahedraBoundingSpheres { get => _tetrahedraBoundingSpheres; }
+            public ProbesBuffer()
+            {
+                _probes = new List<SDFProbe>();
+                _materials = new List<Material>();
+                _boundingSpheres = new List<BoundingSphere>();
+            }
+
+            public void BakeCullingGroup(Camera camera)
+            {
+                _cullingGroup = new CullingGroup();
+                _cullingGroup.targetCamera = camera;
+                _cullingGroup.SetBoundingSpheres(_boundingSpheres.ToArray());
+            }
+
+            ~ProbesBuffer()
+            {
+                Dispose();
+            }
+
+            public void Add(SDFProbe newProbe)
+            {
+                Vector3 boxSize = Vector3.Lerp(newProbe.BoxCollider.size, newProbe.BoxCollider.size + Vector3.one * newProbe.Radius, newProbe.RadiusT) / 2;
+                Vector3 spherePosition = newProbe.transform.position + newProbe.BoxCollider.center;
+                Matrix4x4 matrix = Matrix4x4.Translate(newProbe.BoxCollider.center).inverse * newProbe.transform.worldToLocalMatrix;
+                Material newMaterial = new Material(newProbe.SDFProbeShader);
+                float sphereRadius = newProbe.GenerateBoundingSphereRadius();
+                SDFProbe.SHL2 shl2 = newProbe.GenerateSHL2();
+
+                newMaterial.SetMatrix("_BoxMatrix", matrix);
+                newMaterial.SetVector("_BoxSize", new Vector4(boxSize.x, boxSize.y, boxSize.z, 0));
+                newMaterial.SetVector("_BoxRadius", new Vector4(newProbe.Radius, newProbe.RadiusT, 0, 0));
+                newMaterial.SetFloat("_BoxIntensity", newProbe.Intensity);
+                newMaterial.SetVector("_y0", (Vector3)shl2.y0);
+                newMaterial.SetVector("_y1", (Vector3)shl2.y1);
+                newMaterial.SetVector("_y2", (Vector3)shl2.y2);
+                newMaterial.SetVector("_y3", (Vector3)shl2.y3);
+                newMaterial.SetVector("_y4", (Vector3)shl2.y4);
+                newMaterial.SetVector("_y5", (Vector3)shl2.y5);
+                newMaterial.SetVector("_y6", (Vector3)shl2.y6);
+                newMaterial.SetVector("_y7", (Vector3)shl2.y7);
+                newMaterial.SetVector("_y8", (Vector3)shl2.y8);
+
+                _probes.Add(newProbe);
+                _materials.Add(newMaterial);
+                _boundingSpheres.Add(new BoundingSphere(spherePosition, sphereRadius));
+            }
+
+            public void Dispose()
+            {
+                _cullingGroup?.Dispose();
+                if (_materials != null)
+                    for (int i = 0; i < _materials.Count; i++)
+                        _materials[i]?.DestroySelf();
+            }
+        }
+        [SerializeField] private ProbesBuffer _lightProbesBuffer;
+        [SerializeField] private ProbesBuffer _occlusionProbesBuffer;
+        [SerializeField] private bool _update;
+
+        public ProbesBuffer LightProbesBuffer { get => _lightProbesBuffer; }
+        public ProbesBuffer OcclusionProbesBuffer { get => _occlusionProbesBuffer; }
 
         void Start()
         {
-#if UNITY_EDITOR
-            if (Application.isPlaying)
-                StartCoroutine(BakeAsync());
-#endif
-        }
-
-        public IEnumerator BakeAsync()
-        {
-            yield return StartCoroutine(BakeTetrahedraAsync(true, true));
-            yield return StartCoroutine(BakeShaderDataAsync(true));
-        }
-
-        IEnumerator BakeTetrahedraAsync(bool isAsync, bool bakeCubeMaps)
-        {
-            if (_lightProbeGIShader == null)
-                _lightProbeGIShader = Shader.Find("hickv/LightProbeGI");
-
-            _lightProbes = transform.GetComponentsInChildren<LightProbe>(false);
-
-            if (bakeCubeMaps)
-                for (int i = 0; i < _lightProbes.Length; i++)
-                    yield return StartCoroutine(_lightProbes[i].RenderCubemapAsync());
-
-            // create verts list
-            _vertices = new Vector3[_lightProbes.Length];
-            _shl2s = new LightProbe.SHL2[_lightProbes.Length];
-            for (int i = 0; i < _lightProbes.Length; i++)
-            {
-                _vertices[i] = _lightProbes[i].transform.position;
-                _shl2s[i] = _lightProbes[i].GenerateSHL2();
-            }
-
-            // Bake tetras
-            // _tetrahedra = Delaunay.BowyerWatson3D(_vertices).ToArray();
-            Delaunay3DJob delaunayJob = new Delaunay3DJob()
-            {
-                inVertices = new NativeArray<Vector3>(_vertices, Allocator.TempJob),
-                outTetrahedra = new NativeList<Delaunay3DJob.Tetrahedron>(Allocator.TempJob),
-            };
-            JobHandle jobHandle = delaunayJob.Schedule();
-
-            if (isAsync)
-                while (!jobHandle.IsCompleted)
-                    yield return null;
-
-            jobHandle.Complete();
-
-            _tetrahedra = delaunayJob.outTetrahedra.ToArray();
-
-            delaunayJob.inVertices.Dispose();
-            delaunayJob.outTetrahedra.Dispose();
-        }
-
-        IEnumerator BakeShaderDataAsync(bool isAsync)
-        {
-            _tetrahedraBoundingSpheres = new BoundingSphere[_tetrahedra.Length];
-            if (_tetrahedraMaterials != null)
-                for (int i = 0; i < _tetrahedraMaterials.Length; i++)
-                    _tetrahedraMaterials[i]?.DestroySelf();
-            _tetrahedraMaterials = new Material[_tetrahedra.Length];
-
-            for (int i = 0; i < _tetrahedra.Length; i++)
-            {
-                Delaunay3DJob.Tetrahedron tetrahedron = _tetrahedra[i];
-
-                float3 a = _vertices[tetrahedron._vIndex0];
-                float3 b = _vertices[tetrahedron._vIndex1];
-                float3 c = _vertices[tetrahedron._vIndex2];
-                float3 d = _vertices[tetrahedron._vIndex3];
-
-                float3 abc = math.cross(b - a, c - a);
-                float3 abd = math.cross(b - a, d - a);
-                float3 acd = math.cross(c - a, d - a);
-                float3 bdc = math.cross(d - b, c - b);
-                float totalVolume = math.abs(math.dot(a - d, abc) / 6);
-
-                float3 pos = (float3)tetrahedron._circumCenter;
-                float rad = (float)tetrahedron._circumRadius;
-                _tetrahedraBoundingSpheres[i] = new BoundingSphere(new Vector3(pos.x, pos.y, pos.z), rad);
-
-                Material tetramat = new Material(_lightProbeGIShader);
-                _tetrahedraMaterials[i] = tetramat;
-
-                LightProbe.SHL2 shl2a = _shl2s[tetrahedron._vIndex0];
-                LightProbe.SHL2 shl2b = _shl2s[tetrahedron._vIndex1];
-                LightProbe.SHL2 shl2c = _shl2s[tetrahedron._vIndex2];
-                LightProbe.SHL2 shl2d = _shl2s[tetrahedron._vIndex3];
-
-                // tetrahedron
-                tetramat.SetVector("a", (Vector3)a);
-                tetramat.SetVector("b", (Vector3)b);
-                tetramat.SetVector("abc", (Vector3)abc);
-                tetramat.SetVector("abd", (Vector3)abd);
-                tetramat.SetVector("acd", (Vector3)acd);
-                tetramat.SetVector("bdc", (Vector3)bdc);
-                tetramat.SetFloat("totalVolume", totalVolume);
-
-                // sha
-                tetramat.SetVector("sha_y0", (Vector3)shl2a.y0);
-                tetramat.SetVector("sha_y1", (Vector3)shl2a.y1);
-                tetramat.SetVector("sha_y2", (Vector3)shl2a.y2);
-                tetramat.SetVector("sha_y3", (Vector3)shl2a.y3);
-                tetramat.SetVector("sha_y4", (Vector3)shl2a.y4);
-                tetramat.SetVector("sha_y5", (Vector3)shl2a.y5);
-                tetramat.SetVector("sha_y6", (Vector3)shl2a.y6);
-                tetramat.SetVector("sha_y7", (Vector3)shl2a.y7);
-                tetramat.SetVector("sha_y8", (Vector3)shl2a.y8);
-
-                // shb
-                tetramat.SetVector("shb_y0", (Vector3)shl2b.y0);
-                tetramat.SetVector("shb_y1", (Vector3)shl2b.y1);
-                tetramat.SetVector("shb_y2", (Vector3)shl2b.y2);
-                tetramat.SetVector("shb_y3", (Vector3)shl2b.y3);
-                tetramat.SetVector("shb_y4", (Vector3)shl2b.y4);
-                tetramat.SetVector("shb_y5", (Vector3)shl2b.y5);
-                tetramat.SetVector("shb_y6", (Vector3)shl2b.y6);
-                tetramat.SetVector("shb_y7", (Vector3)shl2b.y7);
-                tetramat.SetVector("shb_y8", (Vector3)shl2b.y8);
-
-                // shc
-                tetramat.SetVector("shc_y0", (Vector3)shl2c.y0);
-                tetramat.SetVector("shc_y1", (Vector3)shl2c.y1);
-                tetramat.SetVector("shc_y2", (Vector3)shl2c.y2);
-                tetramat.SetVector("shc_y3", (Vector3)shl2c.y3);
-                tetramat.SetVector("shc_y4", (Vector3)shl2c.y4);
-                tetramat.SetVector("shc_y5", (Vector3)shl2c.y5);
-                tetramat.SetVector("shc_y6", (Vector3)shl2c.y6);
-                tetramat.SetVector("shc_y7", (Vector3)shl2c.y7);
-                tetramat.SetVector("shc_y8", (Vector3)shl2c.y8);
-
-                // shd
-                tetramat.SetVector("shd_y0", (Vector3)shl2d.y0);
-                tetramat.SetVector("shd_y1", (Vector3)shl2d.y1);
-                tetramat.SetVector("shd_y2", (Vector3)shl2d.y2);
-                tetramat.SetVector("shd_y3", (Vector3)shl2d.y3);
-                tetramat.SetVector("shd_y4", (Vector3)shl2d.y4);
-                tetramat.SetVector("shd_y5", (Vector3)shl2d.y5);
-                tetramat.SetVector("shd_y6", (Vector3)shl2d.y6);
-                tetramat.SetVector("shd_y7", (Vector3)shl2d.y7);
-                tetramat.SetVector("shd_y8", (Vector3)shl2d.y8);
-
-                if (isAsync)
-                    yield return null;
-            }
-
-            if (_tetrahedraCullingGroup != null)
-                _tetrahedraCullingGroup.Dispose();
-            _tetrahedraCullingGroup = new CullingGroup();
-            _tetrahedraCullingGroup.targetCamera = Camera.main;
-            _tetrahedraCullingGroup.SetBoundingSphereCount(_tetrahedra.Length);
-            _tetrahedraCullingGroup.SetBoundingSpheres(_tetrahedraBoundingSpheres);
+            // StartCoroutine(BakeAsync(true));
+            Bake();
         }
 
         void OnDestroy()
         {
-            _tetrahedraCullingGroup?.Dispose();
-            if (_tetrahedraMaterials != null)
-                for (int i = 0; i < _tetrahedraMaterials.Length; i++)
-                    _tetrahedraMaterials[i]?.DestroySelf();
+            _lightProbesBuffer?.Dispose();
+            _occlusionProbesBuffer?.Dispose();
         }
 
-#if UNITY_EDITOR
         void Update()
         {
-            if (_updateTetrahedra && !Application.isPlaying)
-                StartCoroutine(BakeTetrahedraAsync(false, false));
+            if (_update)
+                Bake();
         }
-#endif
 
-        void OnDrawGizmos()
+        public IEnumerator BakeAsync(bool bakeCubeMaps)
         {
-            if (_tetrahedra == null)
-                return;
+            _lightProbesBuffer?.Dispose();
+            _occlusionProbesBuffer?.Dispose();
 
-            Gizmos.color = Gizmos.color = Color.yellow;
-            for (int i = 0; i < _tetrahedra.Length; i++)
+            _lightProbesBuffer = new ProbesBuffer();
+            _occlusionProbesBuffer = new ProbesBuffer();
+
+            SDFProbe[] rawProbes = gameObject.GetComponentsInChildren<SDFProbe>();
+
+            if (bakeCubeMaps)
+                for (int i = 0; i < rawProbes.Length; i++)
+                    yield return StartCoroutine(rawProbes[i].RenderCubemapAsync());
+
+            for (int i = 0; i < rawProbes.Length; i++)
             {
-                Delaunay3DJob.Tetrahedron tetra = _tetrahedra[i];
-
-                Gizmos.DrawLine(_vertices[tetra._vIndex0], _vertices[tetra._vIndex1]);
-                Gizmos.DrawLine(_vertices[tetra._vIndex0], _vertices[tetra._vIndex2]);
-                Gizmos.DrawLine(_vertices[tetra._vIndex0], _vertices[tetra._vIndex3]);
-                Gizmos.DrawLine(_vertices[tetra._vIndex3], _vertices[tetra._vIndex1]);
-                Gizmos.DrawLine(_vertices[tetra._vIndex3], _vertices[tetra._vIndex2]);
-                Gizmos.DrawLine(_vertices[tetra._vIndex2], _vertices[tetra._vIndex1]);
+                if (rawProbes[i].Type == SDFProbe.SDFProbeType.Light)
+                    _lightProbesBuffer.Add(rawProbes[i]);
+                else if (rawProbes[i].Type == SDFProbe.SDFProbeType.Occlusion)
+                    _occlusionProbesBuffer.Add(rawProbes[i]);
+                yield return null;
             }
+
+            _lightProbesBuffer.BakeCullingGroup(Camera.main);
+            _occlusionProbesBuffer.BakeCullingGroup(Camera.main);
+        }
+
+        [NaughtyAttributes.Button]
+        public void Bake()
+        {
+            _lightProbesBuffer?.Dispose();
+            _occlusionProbesBuffer?.Dispose();
+
+            _lightProbesBuffer = new ProbesBuffer();
+            _occlusionProbesBuffer = new ProbesBuffer();
+
+            SDFProbe[] rawProbes = gameObject.GetComponentsInChildren<SDFProbe>();
+
+            for (int i = 0; i < rawProbes.Length; i++)
+            {
+                if (rawProbes[i].Type == SDFProbe.SDFProbeType.Light)
+                    _lightProbesBuffer.Add(rawProbes[i]);
+                else if (rawProbes[i].Type == SDFProbe.SDFProbeType.Occlusion)
+                    _occlusionProbesBuffer.Add(rawProbes[i]);
+            }
+
+            _lightProbesBuffer.BakeCullingGroup(Camera.main);
+            _occlusionProbesBuffer.BakeCullingGroup(Camera.main);
         }
     }
 }

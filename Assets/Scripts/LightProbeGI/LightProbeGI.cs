@@ -4,7 +4,7 @@ using Unity.Jobs;
 using Unity.Collections;
 using System.Collections;
 
-namespace GutEngine
+namespace global_illumination
 {
     [ExecuteInEditMode]
     public class LightProbeGI : MonoBehaviour
