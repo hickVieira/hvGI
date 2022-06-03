@@ -4,7 +4,7 @@ My objective is to find a cheap, performant, decent looking, non-baked (or minim
 
 ## LightProbeGI
 <!-- ![](lightProbeGI0.gif) -->
-I always wanted to try out a tetrahedron-based gi solution. I also wanted to load in levels dynamically in-game, so I could not use Unity's tetrahedralizer (it only works in-Editor). I ended up having to implement my own Boweyer-Watson delaunay tetrahedralizer.
+I always wanted to try out a tetrahedron-based gi solution. I also wanted to load in levels dynamically in-game, so I could not use Unity's tetrahedralizer (it only works in-Editor). I ended up having to implement my own Bowyer-Watson delaunay tetrahedralizer.
 
 It works by interpolating on spherical harmonics (for each of the 4 vertices of tetrahedron). Baking is done using cubemap to sh code I found around (check Acknowledgements).
 
