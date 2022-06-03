@@ -128,6 +128,7 @@ namespace global_illumination
         }
 
         [NaughtyAttributes.Button]
+        [ContextMenu("BakeCubemap")]
         public void BakeCubemap()
         {
             StartCoroutine(BakeCubemapAsync());

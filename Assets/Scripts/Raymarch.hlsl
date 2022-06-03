@@ -15,6 +15,11 @@
         return length(p - spherePosRad.xyz) - spherePosRad.w;
     }
 
+    float sdSphere(float3 p, float radius)
+    {
+        return length(p) - radius;
+    }
+
     float sdRoundBox( float3 p, float3 b, float r )
     {
         float3 q = abs(p) - b;

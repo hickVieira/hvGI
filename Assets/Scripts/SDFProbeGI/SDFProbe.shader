@@ -19,7 +19,7 @@
             #pragma vertex LitPassVertex
             #pragma fragment LitPassFragment
 
-            #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
+            #pragma shader_feature_local_fragment _IS_SPHERE
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Assets/Scripts/Raymarch.hlsl"
@@ -73,11 +73,16 @@
                 float oldSample = SAMPLE_TEXTURE2D_LOD(_MainTex, SamplerState_Point_Clamp, input.uv, 0).r;
 
                 float3 positionWS = worldPosDepth.xyz;
+                
+                #if _IS_SPHERE
+                    float3 spherePos = float3(_BoxMatrix[0].w, _BoxMatrix[1].w, _BoxMatrix[2].w);
+                    float sdf = _BoxIntensity * saturate(1 - sdSphere(positionWS + spherePos, _BoxRadius.x) / _BoxRadius.y);
+                #else
+                    float3 localP = mul(_BoxMatrix, float4(positionWS, 1.0));
+                    float sdf = _BoxIntensity * saturate(1 - sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y);
+                #endif
 
-                float3 localP = mul(_BoxMatrix, float4(positionWS, 1.0));
-                float boxDist = _BoxIntensity * saturate(1 - sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y);
-
-                return max(boxDist, oldSample);
+                return max(sdf, oldSample);
             }
             ENDHLSL
         }
@@ -153,6 +158,7 @@
             #pragma fragment LitPassFragment
 
             #pragma multi_compile_fragment _ _GBUFFER_NORMALS_OCT
+            #pragma shader_feature_local_fragment _IS_SPHERE
 
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Core.hlsl"
             #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/DeclareNormalsTexture.hlsl"
@@ -245,12 +251,17 @@
 
                 float3 positionWS = worldPosDepth.xyz;
 
-                float3 localP = mul(_BoxMatrix, float4(positionWS, 1.0));
-                float boxDist = _BoxIntensity * saturate(1 - sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y);
+                #if _IS_SPHERE
+                    float3 spherePos = float3(_BoxMatrix[0].w, _BoxMatrix[1].w, _BoxMatrix[2].w);
+                    float sdf = _BoxIntensity * saturate(1 - sdSphere(positionWS + spherePos, _BoxRadius.x) / _BoxRadius.y);
+                #else
+                    float3 localP = mul(_BoxMatrix, float4(positionWS, 1.0));
+                    float sdf = _BoxIntensity * saturate(1 - sdRoundBox(localP, _BoxSize, _BoxRadius.x) / _BoxRadius.y);
+                #endif
+
                 float3 sh = SHL2Color(normalWS);
 
-                // return float4(oldSample + sh * boxDist, 1);
-                return float4(max(oldSample, sh * boxDist), 1);
+                return float4(max(oldSample, sh * sdf), 1);
             }
             ENDHLSL
         }

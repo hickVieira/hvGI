@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Rendering;
 using Unity.Mathematics;
 using Unity.Jobs;
 using Unity.Collections;
@@ -17,6 +18,8 @@ namespace global_illumination
             [SerializeField] private List<Material> _materials;
             [SerializeField] private CullingGroup _cullingGroup;
             [SerializeField] private List<BoundingSphere> _boundingSpheres;
+
+            const float EPSILON = 0.01f;
 
             public List<SDFProbe> Probes { get => _probes; }
             public List<Material> Materials { get => _materials; }
@@ -49,11 +52,13 @@ namespace global_illumination
                 Matrix4x4 matrix = Matrix4x4.Translate(newProbe.BoxCollider.center).inverse * newProbe.transform.worldToLocalMatrix;
                 Material newMaterial = new Material(newProbe.SDFProbeShader);
                 float sphereRadius = newProbe.GenerateBoundingSphereRadius();
+                bool isSphere = (boxSize.x + boxSize.y + boxSize.z) <= EPSILON;
 
                 newMaterial.SetMatrix("_BoxMatrix", matrix);
                 newMaterial.SetVector("_BoxSize", new Vector4(boxSize.x, boxSize.y, boxSize.z, 0));
                 newMaterial.SetVector("_BoxRadius", new Vector4(newProbe.Radius, newProbe.RadiusT, 0, 0));
                 newMaterial.SetFloat("_BoxIntensity", newProbe.Intensity);
+                newMaterial.SetKeyword(new LocalKeyword(newMaterial.shader, "_IS_SPHERE"), isSphere);
                 if (useSH)
                 {
                     SDFProbe.SHL2 shl2 = newProbe.GenerateSHL2();
@@ -114,7 +119,7 @@ namespace global_illumination
             _lightProbesBuffer = new ProbesBuffer();
             _occlusionProbesBuffer = new ProbesBuffer();
 
-            SDFProbe[] rawProbes = gameObject.GetComponentsInChildren<SDFProbe>();
+            SDFProbe[] rawProbes = FindObjectsOfType<SDFProbe>();
 
             if (bakeCubeMaps)
                 for (int i = 0; i < rawProbes.Length; i++)
@@ -142,7 +147,7 @@ namespace global_illumination
             _lightProbesBuffer = new ProbesBuffer();
             _occlusionProbesBuffer = new ProbesBuffer();
 
-            SDFProbe[] rawProbes = gameObject.GetComponentsInChildren<SDFProbe>();
+            SDFProbe[] rawProbes = FindObjectsOfType<SDFProbe>();
 
             if (bakeCubeMaps)
                 for (int i = 0; i < rawProbes.Length; i++)
