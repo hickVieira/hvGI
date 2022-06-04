@@ -262,6 +262,7 @@
                 float3 sh = SHL2Color(normalWS);
 
                 return float4(max(oldSample, sh * sdf * sdf), 1);
+                // return float4(oldSample + sh * sdf * sdf, 1);
             }
             ENDHLSL
         }
