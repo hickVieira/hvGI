@@ -132,7 +132,7 @@ namespace global_illumination
             {
                 SDFProbe probe = rawProbes[i];
 
-                if (!probe.gameObject.activeSelf || !probe.enabled)
+                if (!probe.gameObject.activeInHierarchy || !probe.enabled)
                     continue;
 
                 if (probe.Type == SDFProbe.SDFProbeType.Light)

@@ -105,7 +105,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 13d54e1f32ffc9942886e410454fc793, type: 3}
   m_Name: WorldPosition
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
 --- !u!114 &6973269795089189692
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -118,4 +118,4 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f00a1784ee1fc264bb96c75f95fcd9e4, type: 3}
   m_Name: SDF Probe Global Illumination
   m_EditorClassIdentifier: 
-  m_Active: 1
+  m_Active: 0
