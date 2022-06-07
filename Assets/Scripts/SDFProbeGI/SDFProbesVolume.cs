@@ -13,12 +13,12 @@ namespace global_illumination
         [Range(0, 10)] public float _size = 0.5f;
         [Range(0, 10)] public float _radius = 0.5f;
         [Range(0, 10)] public float _radiust = 2f;
-        [Range(0, 4)] public float _probeDensity = 0.5f;
         [Range(1, 512)] public float _probeDensityX = 5;
         [Range(1, 512)] public float _probeDensityY = 5;
         [Range(1, 512)] public float _probeDensityZ = 5;
         public Vector3 _probeOffset = Vector3.one * 0.25f;
         public Vector3 _globalOffset = Vector3.zero;
+        [Range(0, 4)] public float _probeDensity = 0.5f;
 
         private BoxCollider _boxCollider;
 
