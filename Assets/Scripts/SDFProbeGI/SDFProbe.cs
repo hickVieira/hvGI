@@ -38,9 +38,9 @@ namespace global_illumination
         [SerializeField] private Shader _shPreviewShader;
         [SerializeField] private Mesh _shPreviewMesh;
         [SerializeField] private SDFProbeType _type;
-        [SerializeField][Range(0, 2)] private float _intensity = 1f;
-        [SerializeField][Range(0, 2)] private float _radius = 0f;
-        [SerializeField][Range(0.01f, 5)] private float _radiust = 1f;
+        [SerializeField][Range(0, 100)] private float _intensity = 1f;
+        [SerializeField][Range(0, 100)] private float _radius = 0f;
+        [SerializeField][Range(0.01f, 100)] private float _radiust = 1f;
         [SerializeField] private BoxCollider _boxCollider;
         [SerializeField] private float3[] _shCoefficients;
 
@@ -48,10 +48,10 @@ namespace global_illumination
 
         const int RESOLUTION = 128;
 
-        public SDFProbeType Type { get => _type; }
+        public SDFProbeType Type { get => _type; set => _type = value; }
         public float Intensity { get => _intensity; }
-        public float Radius { get => _radius; }
-        public float RadiusT { get => _radiust; }
+        public float Radius { get => _radius; set => _radius = value; }
+        public float RadiusT { get => _radiust; set => _radiust = value; }
         public BoxCollider BoxCollider { get => _boxCollider; }
         public float3[] SHCoefficients { get => _shCoefficients; }
         public Shader SDFProbeShader { get => _sdfProbeShader; }
@@ -148,7 +148,9 @@ namespace global_illumination
             camera.nearClipPlane = 0.001f;
             camera.farClipPlane = 1000;
             float oldIntensity = RenderSettings.ambientIntensity;
+            float oldFog = RenderSettings.fogDensity;
             RenderSettings.ambientIntensity = 0;
+            RenderSettings.fogDensity = 0;
             camera.RenderToCubemap(cubemap);
             // for (int i = 0; i < 6; i++)
             // {
@@ -156,6 +158,7 @@ namespace global_illumination
             //     yield return null;
             // }
             RenderSettings.ambientIntensity = oldIntensity;
+            RenderSettings.fogDensity = oldFog;
             camera.gameObject.DestroySelf();
 
             // bake cubemap to spherical harmonics
